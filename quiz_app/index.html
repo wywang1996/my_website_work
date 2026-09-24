@@ -7,22 +7,311 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="刷题" />
+    <meta name="apple-mobile-web-app-title" content="刷题中心" />
     <meta name="theme-color" content="#2563eb" />
-    <title>智能刷题</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>刷题中心</title>
+    <style>
+      :root {
+        --bg: #f2f4f8;
+        --card: #fff;
+        --text: #111827;
+        --sub: #6b7280;
+        --primary: #2563eb;
+        --primary-soft: #e8efff;
+        --green: #15803d;
+        --green-soft: #e7f6ec;
+        --red: #b91c1c;
+        --red-soft: #fdecec;
+        --amber: #d97706;
+        --amber-soft: #fef3c7;
+        --border: #e5e7eb;
+        --shadow:
+          0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
+      }
+      :root[data-theme="dark"] {
+        --bg: #0f172a;
+        --card: #1e293b;
+        --text: #f1f5f9;
+        --sub: #94a3b8;
+        --primary: #60a5fa;
+        --primary-soft: #1e3a5f;
+        --green: #4ade80;
+        --green-soft: #14382a;
+        --red: #f87171;
+        --red-soft: #4a1e1e;
+        --amber: #fbbf24;
+        --amber-soft: #422006;
+        --border: #334155;
+        --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+      }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+      }
+      body {
+        margin: 0 auto;
+        max-width: 760px;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          16px/1.65 -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          sans-serif;
+        padding: 24px 16px calc(32px + env(safe-area-inset-bottom));
+        transition:
+          background-color 0.2s,
+          color 0.2s;
+      }
+      h1 {
+        text-align: center;
+        font-size: 24px;
+        margin: 16px 0 6px;
+      }
+      .subtitle {
+        text-align: center;
+        color: var(--sub);
+        font-size: 13px;
+        margin-bottom: 24px;
+      }
+      .stat-card {
+        display: flex;
+        background: var(--card);
+        border-radius: 16px;
+        padding: 18px 8px;
+        box-shadow: var(--shadow);
+        margin-bottom: 24px;
+      }
+      .stat-item {
+        flex: 1;
+        text-align: center;
+      }
+      .stat-item b {
+        display: block;
+        font-size: 22px;
+        color: var(--primary);
+        font-weight: 700;
+        line-height: 1.3;
+      }
+      .stat-item b i {
+        font-size: 13px;
+        font-style: normal;
+      }
+      .stat-item span {
+        font-size: 12px;
+        color: var(--sub);
+      }
+
+      .sec-title {
+        font-size: 14px;
+        color: var(--sub);
+        font-weight: 600;
+        margin: 20px 0 10px;
+        letter-spacing: 0.5px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+        background: var(--card);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: var(--shadow);
+        text-align: left;
+        text-decoration: none;
+        color: var(--text);
+        transition: transform 0.12s;
+        border: 1px solid transparent;
+        cursor: pointer;
+      }
+      .card:active {
+        transform: scale(0.97);
+        border-color: var(--primary);
+      }
+      .card-name {
+        font-size: 15px;
+        font-weight: 600;
+      }
+      .card-sub {
+        font-size: 12px;
+        color: var(--sub);
+      }
+      .card.wide {
+        grid-column: span 2;
+      }
+      .card.big .card-name {
+        font-size: 17px;
+      }
+
+      .tag-wrong {
+        color: var(--red);
+      }
+      .tag-fav {
+        color: #d97706;
+      }
+
+      .tip {
+        font-size: 12px;
+        color: var(--sub);
+        text-align: center;
+        margin-top: 24px;
+      }
+
+      .theme-btn {
+        position: fixed;
+        top: calc(env(safe-area-inset-top) + 12px);
+        right: 16px;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--card);
+        color: var(--text);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        z-index: 10;
+        cursor: pointer;
+      }
+      .theme-btn:active {
+        background: var(--primary-soft);
+      }
+    </style>
   </head>
   <body>
-    <div id="topbar" class="topbar"></div>
-    <main id="view" class="view"></main>
+    <button class="theme-btn" id="theme-btn" aria-label="切换深色模式">
+      🌙
+    </button>
 
-    <script src="data/politics.js"></script>
-    <script src="data/disaster.js"></script>
-    <script src="data/general.js"></script>
-    <script src="data/career.js"></script>
+    <h1>📚 刷题中心</h1>
+    <p class="subtitle">本地数据 · 与刷题页实时同步</p>
 
-    <script src="app.js"></script>
+    <section class="stat-card">
+      <div class="stat-item"><b id="stat-total">0</b><span>累计答题</span></div>
+      <div class="stat-item"><b id="stat-correct">0</b><span>答对</span></div>
+      <div class="stat-item">
+        <b id="stat-rate">0<i>%</i></b
+        ><span>正确率</span>
+      </div>
+    </section>
+
+    <h2 class="sec-title">📝 快速入口</h2>
+    <div class="grid">
+      <a class="card wide big" href="quiz_app/index.html">
+        <span class="card-name">🚀 进入刷题</span>
+        <span class="card-sub">政治理论 · 防震减灾 · 通识知识 · 职业能力</span>
+      </a>
+    </div>
+
+    <h2 class="sec-title">📂 我的记录</h2>
+    <div class="grid">
+      <a class="card" href="quiz_app/index.html?mode=wrong">
+        <span class="card-name tag-wrong">📕 错题本</span>
+        <span class="card-sub"><span id="wrong-count">0</span> 题待复习</span>
+      </a>
+      <a class="card" href="quiz_app/index.html?mode=fav">
+        <span class="card-name tag-fav">⭐ 我的收藏</span>
+        <span class="card-sub"><span id="fav-count">0</span> 题已收藏</span>
+      </a>
+    </div>
+
+    <h2 class="sec-title">🎯 模拟考试</h2>
+    <div class="grid">
+      <a class="card wide" href="quiz_app/index.html?mode=exam">
+        <span class="card-name">🎯 全题库模拟</span>
+        <span class="card-sub">随机抽 20 题 · 交卷后统一评分与解析</span>
+      </a>
+    </div>
+
+    <h2 class="sec-title">📖 复习资料</h2>
+    <div class="grid">
+      <a class="card wide" href="notes/index.html">
+        <span class="card-name">📖 知识点速查</span>
+        <span class="card-sub">政治 · 防震 · 通识 · 职测 全部核心考点</span>
+      </a>
+    </div>
+
+    <p class="tip">数据仅保存在本机浏览器 · Windows 与手机不互通</p>
+
+    <script>
+      (function () {
+        /* ---------------- 主题 ---------------- */
+        const THEME_KEY = "qz_theme_v1";
+        function getTheme() {
+          try {
+            const v = localStorage.getItem(THEME_KEY);
+            return v == null ? "light" : JSON.parse(v);
+          } catch (e) {
+            return "light";
+          }
+        }
+        function applyTheme() {
+          const theme = getTheme();
+          document.documentElement.setAttribute("data-theme", theme);
+          const btn = document.getElementById("theme-btn");
+          if (btn) btn.textContent = theme === "dark" ? "☀️" : "🌙";
+          const meta = document.querySelector('meta[name="theme-color"]');
+          if (meta)
+            meta.setAttribute(
+              "content",
+              theme === "dark" ? "#0f172a" : "#2563eb",
+            );
+        }
+        document
+          .getElementById("theme-btn")
+          .addEventListener("click", function () {
+            const next = getTheme() === "dark" ? "light" : "dark";
+            try {
+              localStorage.setItem(THEME_KEY, JSON.stringify(next));
+            } catch (e) {}
+            applyTheme();
+          });
+
+        /* ---------------- 数据读取 ---------------- */
+        const K = {
+          wrong: "qz_wrong_v1",
+          fav: "qz_fav_v1",
+          stats: "qz_stats_v1",
+        };
+        function read(key, fallback) {
+          try {
+            const v = localStorage.getItem(key);
+            return v == null ? fallback : JSON.parse(v);
+          } catch (e) {
+            return fallback;
+          }
+        }
+
+        const wrong = read(K.wrong, []);
+        const fav = read(K.fav, []);
+        const stats = read(K.stats, { total: 0, correct: 0 });
+
+        document.getElementById("wrong-count").textContent = wrong.length;
+        document.getElementById("fav-count").textContent = fav.length;
+
+        const total = stats.total || 0;
+        const correct = stats.correct || 0;
+        const rate = total ? Math.round((correct / total) * 100) : 0;
+
+        document.getElementById("stat-total").textContent = total;
+        document.getElementById("stat-correct").textContent = correct;
+        document.getElementById("stat-rate").innerHTML = rate + "<i>%</i>";
+
+        /* ---------------- 启动 ---------------- */
+        applyTheme();
+      })();
+    </script>
   </body>
 </html>
