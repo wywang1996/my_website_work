@@ -8,6 +8,9 @@
     wrong: "qz_wrong_v1",
     fav: "qz_fav_v1",
     stats: "qz_stats_v1",
+    progress: "qz_progress_v1",
+    theme: "qz_theme_v1",
+    session: "qz_session_v1",
   };
 
   const LS = {
@@ -44,7 +47,6 @@
     });
   }
 
-  // 去掉选项开头可能自带的 "A." "A、" 等前缀
   function cleanOpt(s) {
     return String(s).replace(/^\s*[A-Za-z][\.、．)）]\s*/, "");
   }
@@ -67,7 +69,28 @@
   }
 
   /* ============================================================
-     二、题库读取
+     二、主题
+     ============================================================ */
+  function getTheme() {
+    return LS.get(K.theme, "light");
+  }
+  function applyTheme() {
+    const theme = getTheme();
+    document.documentElement.setAttribute("data-theme", theme);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute("content", theme === "dark" ? "#0f172a" : "#2563eb");
+    }
+  }
+  function toggleTheme() {
+    LS.set(K.theme, getTheme() === "dark" ? "light" : "dark");
+    applyTheme();
+    if (session) renderQuestion();
+    else renderHome();
+  }
+
+  /* ============================================================
+     三、题库读取
      ============================================================ */
   function getAllQuestions() {
     const all = [];
@@ -79,13 +102,12 @@
     });
     return all;
   }
-
   function getModules() {
     return Object.keys(window.ModuleData || {});
   }
 
   /* ============================================================
-     三、本地存储
+     四、本地存储：错题、收藏、统计、进度
      ============================================================ */
   function getWrong() {
     return LS.get(K.wrong, []);
@@ -129,23 +151,20 @@
   }
 
   /* ============================================================
-     四、会话状态
+     五、会话状态
      ============================================================ */
   let session = null;
 
   function currentQuestion() {
     return session ? session.list[session.index] : null;
   }
-
   function getUserAnswer(q) {
     return (session && session.userAnswers[q.id]) || [];
   }
-
   function setUserAnswer(q, arr) {
     if (!session) return;
     session.userAnswers[q.id] = arr.slice();
   }
-
   function isQuestionSubmitted(q) {
     if (!session) return false;
     if (session.reviewMode) return true;
@@ -154,7 +173,89 @@
   }
 
   /* ============================================================
-     五、首页
+     六、会话快照（刷新恢复）
+     ============================================================ */
+  function saveSessionSnapshot() {
+    if (!session) {
+      LS.set(K.session, null);
+      return;
+    }
+    const snapshot = {
+      mode: session.mode,
+      module: session.module,
+      title: session.title,
+      questionIds: session.list.map(function (q) {
+        return q.id;
+      }),
+      index: session.index,
+      userAnswers: session.userAnswers,
+      submittedMap: session.submittedMap,
+      examSubmitted: session.examSubmitted,
+      reviewMode: session.reviewMode,
+      correctCount: session.correctCount,
+      wrongCount: session.wrongCount,
+      counted: session.counted,
+      savedAt: Date.now(),
+    };
+    LS.set(K.session, snapshot);
+  }
+
+  function clearSessionSnapshot() {
+    LS.set(K.session, null);
+  }
+
+  function restoreSession() {
+    const snap = LS.get(K.session, null);
+    if (!snap || !snap.questionIds || !snap.questionIds.length) return false;
+
+    const all = getAllQuestions();
+    const byId = {};
+    all.forEach(function (q) {
+      byId[q.id] = q;
+    });
+    const list = snap.questionIds
+      .map(function (id) {
+        return byId[id];
+      })
+      .filter(Boolean);
+
+    if (list.length !== snap.questionIds.length) {
+      // 题库变了，放弃恢复
+      clearSessionSnapshot();
+      return false;
+    }
+
+    session = {
+      mode: snap.mode,
+      module: snap.module || "",
+      title: snap.title,
+      list: list,
+      index: Math.min(snap.index || 0, list.length - 1),
+      userAnswers: snap.userAnswers || {},
+      submittedMap: snap.submittedMap || {},
+      examSubmitted: !!snap.examSubmitted,
+      reviewMode: !!snap.reviewMode,
+      correctCount: snap.correctCount || 0,
+      wrongCount: snap.wrongCount || 0,
+      counted: snap.counted || {},
+    };
+    return true;
+  }
+
+  function getSavedSessionSummary() {
+    const snap = LS.get(K.session, null);
+    if (!snap || !snap.questionIds || !snap.questionIds.length) return null;
+    return {
+      title: snap.title || "未命名练习",
+      index: (snap.index || 0) + 1,
+      total: snap.questionIds.length,
+      mode: snap.mode,
+      module: snap.module || "",
+    };
+  }
+
+  /* ============================================================
+     七、首页
      ============================================================ */
   function renderHome() {
     session = null;
@@ -166,12 +267,35 @@
     const modules = getModules();
     const wrongN = getWrong().length;
     const favN = getFav().length;
+    const progress = LS.get(K.progress, {});
+    const saved = getSavedSessionSummary();
 
-    topbarEl.innerHTML = '<div class="tb-title">📚 智能刷题</div>';
+    topbarEl.innerHTML =
+      '<div class="tb-title">📚 智能刷题</div>' +
+      '<button class="tb-icon-btn" data-act="theme">' +
+      (getTheme() === "dark" ? "☀️" : "🌙") +
+      "</button>";
+
+    const resumeBanner = saved
+      ? '<button class="card wide resume" data-act="resume">' +
+        '<span class="card-name">▶️ 继续上次练习</span>' +
+        '<span class="card-sub">' +
+        esc(saved.title) +
+        " · 第 " +
+        saved.index +
+        " / " +
+        saved.total +
+        " 题</span>" +
+        "</button>"
+      : "";
 
     const moduleCards = modules
       .map(function (m, i) {
         const n = (window.ModuleData[m] || []).length;
+        let sub = n + " 题 · 逐题解析";
+        if (progress[m] != null && progress[m] > 0 && progress[m] < n) {
+          sub += " · 上次做到第 " + (progress[m] + 1) + " 题";
+        }
         return (
           '<button class="card" data-act="start" data-mode="module" data-mi="' +
           i +
@@ -180,8 +304,8 @@
           esc(m) +
           "</span>" +
           '<span class="card-sub">' +
-          n +
-          " 题 · 逐题解析</span>" +
+          sub +
+          "</span>" +
           "</button>"
         );
       })
@@ -199,9 +323,14 @@
       rate +
       '<i style="font-size:13px;font-style:normal;">%</i></b><span>正确率</span></div>' +
       "</section>" +
+      (resumeBanner
+        ? '<div class="grid" style="margin-bottom:20px;">' +
+          resumeBanner +
+          "</div>"
+        : "") +
       '<h2 class="sec-title">📝 全题库模拟（交卷后看答案）</h2>' +
       '<div class="grid">' +
-      '<button class="card" data-act="start" data-mode="exam" style="grid-column: span 2;">' +
+      '<button class="card wide" data-act="start" data-mode="exam">' +
       '<span class="card-name">🎯 开始全题库模拟</span>' +
       '<span class="card-sub">随机抽取 20 题 · 交卷后统一评分与解析</span>' +
       "</button>" +
@@ -225,16 +354,16 @@
       " 题</span>" +
       "</button>" +
       "</div>" +
-      '<div class="foot" style="margin-top:24px;text-align:center;">' +
+      '<div class="foot">' +
       '<button class="btn ghost small" data-act="reset-stats">清空统计数据</button>' +
       "</div>" +
-      '<p style="font-size:12px;color:var(--sub);text-align:center;margin-top:10px;">数据仅保存在本机浏览器</p>';
+      '<p class="tip">数据仅保存在本机浏览器 · 电脑端可用 A/B/C/D 选择、← → 翻页、S 收藏、M 打开答题卡</p>';
 
     window.scrollTo(0, 0);
   }
 
   /* ============================================================
-     六、开始练习
+     八、开始练习
      ============================================================ */
   function startPractice(mode, moduleName) {
     let list = [];
@@ -272,12 +401,24 @@
       return;
     }
 
+    let startIndex = 0;
+    if (mode === "module" && moduleName) {
+      const progress = LS.get(K.progress, {});
+      if (
+        progress[moduleName] != null &&
+        progress[moduleName] >= 0 &&
+        progress[moduleName] < list.length
+      ) {
+        startIndex = progress[moduleName];
+      }
+    }
+
     session = {
       mode: mode,
       module: moduleName || "",
       title: title,
       list: list,
-      index: 0,
+      index: startIndex,
       userAnswers: {},
       submittedMap: {},
       examSubmitted: false,
@@ -292,10 +433,21 @@
   }
 
   /* ============================================================
-     七、答题页
+     九、答题页
      ============================================================ */
   function renderQuestion() {
     if (!session) return;
+
+    // 保存模块进度
+    if (session.mode === "module" && session.module) {
+      const progress = LS.get(K.progress, {});
+      progress[session.module] = session.index;
+      LS.set(K.progress, progress);
+    }
+
+    // 保存会话快照，支持刷新恢复
+    saveSessionSnapshot();
+
     const q = currentQuestion();
     if (!q) {
       renderResult();
@@ -313,11 +465,14 @@
       '<div class="tb-title">' +
       esc(session.title) +
       "</div>" +
-      '<div class="tb-count">' +
+      '<button class="tb-card-btn" data-act="ac-open">📋 ' +
       (index + 1) +
-      " / " +
+      "/" +
       total +
-      "</div>";
+      "</button>" +
+      '<button class="tb-icon-btn" data-act="theme">' +
+      (getTheme() === "dark" ? "☀️" : "🌙") +
+      "</button>";
 
     const typeLabel =
       { single: "单选题", multi: "多选题", judge: "判断题" }[q.type] ||
@@ -474,7 +629,108 @@
   }
 
   /* ============================================================
-     八、操作处理
+     十、答题卡
+     ============================================================ */
+  function openAnswerCard() {
+    if (!session) return;
+    const total = session.list.length;
+    const cur = session.index;
+
+    let cells = "";
+    for (let i = 0; i < total; i++) {
+      const q = session.list[i];
+      const submitted = isQuestionSubmitted(q);
+      const ans = session.userAnswers[q.id] || [];
+      let cls = "ac-cell";
+      if (i === cur) cls += " current";
+      if (submitted) {
+        cls += sameSet(ans, q.answer) ? " ok" : " bad";
+      } else if (ans.length) {
+        cls += " selected";
+      }
+      cells +=
+        '<button class="' +
+        cls +
+        '" data-act="ac-jump" data-i="' +
+        i +
+        '">' +
+        (i + 1) +
+        "</button>";
+    }
+
+    let overlay = document.getElementById("ac-overlay");
+    if (!overlay) {
+      overlay = document.createElement("div");
+      overlay.id = "ac-overlay";
+      overlay.className = "ac-overlay";
+      document.body.appendChild(overlay);
+    }
+
+    overlay.innerHTML =
+      '<div class="ac-mask" data-act="ac-close"></div>' +
+      '<div class="ac-panel">' +
+      '<div class="ac-head">' +
+      '<span class="ac-title">答题卡</span>' +
+      '<div class="ac-legend">' +
+      '<span><i class="lg ok"></i>对</span>' +
+      '<span><i class="lg bad"></i>错</span>' +
+      '<span><i class="lg selected"></i>已选</span>' +
+      '<span><i class="lg"></i>未答</span>' +
+      "</div>" +
+      '<button class="ac-close-btn" data-act="ac-close">✕</button>' +
+      "</div>" +
+      '<div class="ac-jump-row">' +
+      '<input id="ac-jump-input" type="number" min="1" max="' +
+      total +
+      '" placeholder="输入题号 1-' +
+      total +
+      '，回车跳转">' +
+      '<button data-act="ac-jump-input">跳转</button>' +
+      "</div>" +
+      '<div class="ac-body">' +
+      '<div class="ac-grid">' +
+      cells +
+      "</div>" +
+      "</div>" +
+      "</div>";
+
+    overlay.classList.add("show");
+
+    // 滚到当前题附近
+    setTimeout(function () {
+      const curCell = overlay.querySelector(".ac-cell.current");
+      if (curCell) curCell.scrollIntoView({ block: "center" });
+    }, 60);
+  }
+
+  function closeAnswerCard() {
+    const overlay = document.getElementById("ac-overlay");
+    if (overlay) overlay.classList.remove("show");
+  }
+
+  function jumpTo(index) {
+    if (!session) return;
+    const total = session.list.length;
+    if (isNaN(index) || index < 0 || index >= total) return;
+    session.index = index;
+    closeAnswerCard();
+    renderQuestion();
+    window.scrollTo(0, 0);
+  }
+
+  function handleAcJumpInput() {
+    const input = document.getElementById("ac-jump-input");
+    if (!input) return;
+    const num = parseInt(input.value, 10);
+    if (isNaN(num) || num < 1 || num > session.list.length) {
+      alert("请输入 1 到 " + session.list.length + " 之间的题号");
+      return;
+    }
+    jumpTo(num - 1);
+  }
+
+  /* ============================================================
+     十一、操作处理
      ============================================================ */
   function handleOption(i) {
     if (!session) return;
@@ -597,7 +853,6 @@
       return;
     }
 
-    // 单项模式
     if (!isQuestionSubmitted(q)) {
       if (q.type === "multi") {
         alert("请先选择答案并点击「提交答案」");
@@ -636,7 +891,7 @@
   }
 
   /* ============================================================
-     九、结果页
+     十二、结果页
      ============================================================ */
   function renderResult() {
     if (!session) return;
@@ -647,9 +902,11 @@
     const emoji = rate >= 80 ? "🎉" : rate >= 60 ? "👍" : "💪";
 
     topbarEl.innerHTML =
-      '<button class="tb-back" data-act="home">‹ 返回</button>' +
+      '<button class="tb-back" data-act="home" data-clear="1">‹ 返回</button>' +
       '<div class="tb-title">练习结果</div>' +
-      '<div class="tb-count"></div>';
+      '<button class="tb-icon-btn" data-act="theme">' +
+      (getTheme() === "dark" ? "☀️" : "🌙") +
+      "</button>";
 
     const isExam = session.mode === "exam";
     const reviewBtn =
@@ -684,14 +941,14 @@
       reviewBtn +
       '<button class="btn ghost" data-act="start" data-mode="wrong">去错题本</button>' +
       '<button class="btn primary" data-act="restart">再练一组</button>' +
-      '<button class="btn ghost" data-act="home">返回首页</button>' +
+      '<button class="btn ghost" data-act="home" data-clear="1">返回首页</button>' +
       "</div>";
 
     window.scrollTo(0, 0);
   }
 
   /* ============================================================
-     十、事件委托
+     十三、事件委托
      ============================================================ */
   document.addEventListener("click", function (e) {
     const el = e.target.closest("[data-act]");
@@ -717,6 +974,7 @@
     } else if (act === "fav") {
       handleFav();
     } else if (act === "home") {
+      if (el.dataset.clear === "1") clearSessionSnapshot();
       renderHome();
     } else if (act === "restart") {
       const m = session.mode;
@@ -731,19 +989,132 @@
       session.reviewMode = true;
       session.index = 0;
       renderQuestion();
-    } else if (act === "back-result") {
-      session.reviewMode = false;
-      renderResult();
+    } else if (act === "theme") {
+      toggleTheme();
+    } else if (act === "resume") {
+      if (restoreSession()) {
+        renderQuestion();
+        window.scrollTo(0, 0);
+      } else {
+        alert("无法恢复上次练习");
+        clearSessionSnapshot();
+        renderHome();
+      }
+    } else if (act === "ac-open") {
+      openAnswerCard();
+    } else if (act === "ac-close") {
+      closeAnswerCard();
+    } else if (act === "ac-jump") {
+      jumpTo(Number(el.dataset.i));
+    } else if (act === "ac-jump-input") {
+      handleAcJumpInput();
     }
   });
 
   /* ============================================================
-     十一、启动
+     十四、键盘快捷键（电脑端）
      ============================================================ */
+  document.addEventListener("keydown", function (e) {
+    // 输入框里不触发快捷键
+    const tag = e.target && e.target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA") {
+      if (e.target.id === "ac-jump-input" && e.key === "Enter") {
+        e.preventDefault();
+        handleAcJumpInput();
+      }
+      return;
+    }
+
+    // ESC 关闭答题卡
+    if (e.key === "Escape") {
+      closeAnswerCard();
+      return;
+    }
+
+    // 答题卡打开时，屏蔽其他快捷键（除 ESC）
+    const overlay = document.getElementById("ac-overlay");
+    if (overlay && overlay.classList.contains("show")) return;
+
+    if (!session) return;
+    const q = currentQuestion();
+    if (!q) return;
+
+    const key = e.key.toUpperCase();
+
+    // A/B/C/D... 选择选项
+    const letterIndex = LETTERS.indexOf(key);
+    if (letterIndex >= 0 && letterIndex < q.options.length) {
+      e.preventDefault();
+      handleOption(letterIndex);
+      return;
+    }
+
+    // Enter：提交 / 下一题
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (session.reviewMode) {
+        handleNext();
+      } else if (session.mode === "exam") {
+        handleNext();
+      } else if (!isQuestionSubmitted(q)) {
+        if (q.type === "multi") handleSubmit();
+        else if (getUserAnswer(q).length) submitSingle(q);
+        else handleNext();
+      } else {
+        handleNext();
+      }
+      return;
+    }
+
+    // ← → 翻页
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      handlePrev();
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      handleNext();
+      return;
+    }
+
+    // S 收藏
+    if (key === "S") {
+      e.preventDefault();
+      handleFav();
+      return;
+    }
+
+    // M 打开答题卡
+    if (key === "M") {
+      e.preventDefault();
+      openAnswerCard();
+      return;
+    }
+  });
+
+  /* ============================================================
+     十五、启动
+     ============================================================ */
+  function getUrlParam(name) {
+    try {
+      return new URLSearchParams(window.location.search).get(name);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  applyTheme();
+
   if (Object.keys(window.ModuleData || {}).length === 0) {
     viewEl.innerHTML =
       '<p style="text-align:center;color:var(--sub);padding:40px 0;">题库为空，请在 data 文件夹添加题库文件。</p>';
   } else {
-    renderHome();
+    const mode = getUrlParam("mode");
+    if (mode === "wrong" || mode === "fav" || mode === "exam") {
+      startPractice(mode);
+    } else {
+      renderHome();
+    }
   }
 })();
