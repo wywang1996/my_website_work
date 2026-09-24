@@ -7,23 +7,22 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="刷题中心" />
     <meta name="theme-color" content="#2563eb" />
     <title>刷题中心</title>
     <style>
       :root {
-        --bg: #f2f4f8;
+        --bg: #fbfbfd;
         --card: #fff;
-        --text: #111827;
-        --sub: #6b7280;
+        --text: #1f2937;
+        --text-2: #4b5563;
+        --sub: #9ca3af;
         --primary: #2563eb;
-        --primary-soft: #e8efff;
-        --green: #15803d;
-        --green-soft: #e7f6ec;
-        --red: #b91c1c;
-        --red-soft: #fdecec;
+        --primary-soft: #eef2ff;
+        --red: #dc2626;
         --amber: #d97706;
-        --amber-soft: #fef3c7;
         --border: #e5e7eb;
         --shadow:
           0 1px 3px rgba(16, 24, 40, 0.06), 0 1px 2px rgba(16, 24, 40, 0.04);
@@ -31,16 +30,13 @@
       :root[data-theme="dark"] {
         --bg: #0f172a;
         --card: #1e293b;
-        --text: #f1f5f9;
+        --text: #e2e8f0;
+        --text-2: #cbd5e1;
         --sub: #94a3b8;
         --primary: #60a5fa;
         --primary-soft: #1e3a5f;
-        --green: #4ade80;
-        --green-soft: #14382a;
         --red: #f87171;
-        --red-soft: #4a1e1e;
         --amber: #fbbf24;
-        --amber-soft: #422006;
         --border: #334155;
         --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
       }
@@ -105,7 +101,6 @@
         font-size: 12px;
         color: var(--sub);
       }
-
       .sec-title {
         font-size: 14px;
         color: var(--sub);
@@ -130,7 +125,9 @@
         text-align: left;
         text-decoration: none;
         color: var(--text);
-        transition: transform 0.12s;
+        transition:
+          transform 0.12s,
+          border-color 0.12s;
         border: 1px solid transparent;
         cursor: pointer;
       }
@@ -152,21 +149,19 @@
       .card.big .card-name {
         font-size: 17px;
       }
-
       .tag-wrong {
         color: var(--red);
       }
       .tag-fav {
-        color: #d97706;
+        color: var(--amber);
       }
-
       .tip {
         font-size: 12px;
         color: var(--sub);
         text-align: center;
         margin-top: 24px;
+        line-height: 1.7;
       }
-
       .theme-btn {
         position: fixed;
         top: calc(env(safe-area-inset-top) + 12px);
@@ -188,6 +183,14 @@
       .theme-btn:active {
         background: var(--primary-soft);
       }
+      @media (max-width: 480px) {
+        .stat-item b {
+          font-size: 20px;
+        }
+        .card {
+          padding: 14px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -207,21 +210,33 @@
       </div>
     </section>
 
-    <h2 class="sec-title">📝 快速入口</h2>
+    <h2 class="sec-title">📖 单项刷题</h2>
     <div class="grid">
-      <a class="card wide big" href="quiz_app/index.html">
-        <span class="card-name">🚀 进入刷题</span>
-        <span class="card-sub">政治理论 · 防震减灾 · 通识知识 · 职业能力</span>
+      <a class="card" href="quiz.html?module=政治理论综合">
+        <span class="card-name">政治理论综合</span>
+        <span class="card-sub">马哲 · 毛概 · 中特 · 习思想 · 时政</span>
+      </a>
+      <a class="card" href="quiz.html?module=防震减灾知识">
+        <span class="card-name">防震减灾知识</span>
+        <span class="card-sub">法律 · 基础知识 · 地震常识</span>
+      </a>
+      <a class="card" href="quiz.html?module=通识知识">
+        <span class="card-name">通识知识</span>
+        <span class="card-sub">自然科学 · 高新科技 · 文史</span>
+      </a>
+      <a class="card" href="quiz.html?module=职业能力测试">
+        <span class="card-name">职业能力测试</span>
+        <span class="card-sub">逻辑 · 数量 · 言语 · 资料</span>
       </a>
     </div>
 
     <h2 class="sec-title">📂 我的记录</h2>
     <div class="grid">
-      <a class="card" href="quiz_app/index.html?mode=wrong">
+      <a class="card" href="quiz.html?mode=wrong">
         <span class="card-name tag-wrong">📕 错题本</span>
         <span class="card-sub"><span id="wrong-count">0</span> 题待复习</span>
       </a>
-      <a class="card" href="quiz_app/index.html?mode=fav">
+      <a class="card" href="quiz.html?mode=fav">
         <span class="card-name tag-fav">⭐ 我的收藏</span>
         <span class="card-sub"><span id="fav-count">0</span> 题已收藏</span>
       </a>
@@ -229,17 +244,29 @@
 
     <h2 class="sec-title">🎯 模拟考试</h2>
     <div class="grid">
-      <a class="card wide" href="quiz_app/index.html?mode=exam">
+      <a class="card wide" href="quiz.html?mode=exam">
         <span class="card-name">🎯 全题库模拟</span>
         <span class="card-sub">随机抽 20 题 · 交卷后统一评分与解析</span>
       </a>
     </div>
 
-    <h2 class="sec-title">📖 复习资料</h2>
+    <h2 class="sec-title">📝 复习资料</h2>
     <div class="grid">
-      <a class="card wide" href="notes/index.html">
-        <span class="card-name">📖 知识点速查</span>
-        <span class="card-sub">政治 · 防震 · 通识 · 职测 全部核心考点</span>
+      <a class="card" href="notes/index.html?tab=politics">
+        <span class="card-name">政治理论笔记</span>
+        <span class="card-sub">马哲 · 毛概 · 中特 · 习思想</span>
+      </a>
+      <a class="card" href="notes/index.html?tab=disaster">
+        <span class="card-name">防震减灾笔记</span>
+        <span class="card-sub">法律 · 基础 · 常识</span>
+      </a>
+      <a class="card" href="notes/index.html?tab=general">
+        <span class="card-name">通识知识笔记</span>
+        <span class="card-sub">自然科学 · 高新科技 · 文史</span>
+      </a>
+      <a class="card" href="notes/index.html?tab=career">
+        <span class="card-name">职业能力笔记</span>
+        <span class="card-sub">逻辑 · 数量 · 言语 · 资料</span>
       </a>
     </div>
 
@@ -247,7 +274,6 @@
 
     <script>
       (function () {
-        /* ---------------- 主题 ---------------- */
         const THEME_KEY = "qz_theme_v1";
         function getTheme() {
           try {
@@ -279,7 +305,6 @@
             applyTheme();
           });
 
-        /* ---------------- 数据读取 ---------------- */
         const K = {
           wrong: "qz_wrong_v1",
           fav: "qz_fav_v1",
@@ -309,7 +334,6 @@
         document.getElementById("stat-correct").textContent = correct;
         document.getElementById("stat-rate").innerHTML = rate + "<i>%</i>";
 
-        /* ---------------- 启动 ---------------- */
         applyTheme();
       })();
     </script>

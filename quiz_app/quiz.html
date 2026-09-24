@@ -9,28 +9,19 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="知识点速查" />
+    <meta name="apple-mobile-web-app-title" content="刷题" />
     <meta name="theme-color" content="#2563eb" />
-    <title>知识点速查</title>
+    <title>智能刷题</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <!-- 顶栏 -->
     <div id="topbar" class="topbar"></div>
+    <main id="view" class="view"></main>
 
-    <!-- 模块切换 Tab -->
-    <div id="tabs" class="tabs"></div>
-
-    <!-- 内容容器 -->
-    <div id="view"></div>
-
-    <!-- 数据文件：每个模块一个 js 文件，都往 window.ALL_NOTES 里 push -->
-    <script src="politics-data.js"></script>
-    <script src="disaster-data.js"></script>
-    <script src="general-data.js"></script>
-    <script src="career-data.js"></script>
-
-    <!-- 渲染逻辑 -->
+    <script src="data/politics.js"></script>
+    <script src="data/disaster.js"></script>
+    <script src="data/general.js"></script>
+    <script src="data/career.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

@@ -25,9 +25,7 @@
     set(k, v) {
       try {
         localStorage.setItem(k, JSON.stringify(v));
-      } catch (e) {
-        console.warn("保存失败", e);
-      }
+      } catch (e) {}
     },
   };
 
@@ -78,9 +76,8 @@
     const theme = getTheme();
     document.documentElement.setAttribute("data-theme", theme);
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) {
+    if (meta)
       meta.setAttribute("content", theme === "dark" ? "#0f172a" : "#2563eb");
-    }
   }
   function toggleTheme() {
     LS.set(K.theme, getTheme() === "dark" ? "light" : "dark");
@@ -102,6 +99,7 @@
     });
     return all;
   }
+
   function getModules() {
     return Object.keys(window.ModuleData || {});
   }
@@ -199,11 +197,9 @@
     };
     LS.set(K.session, snapshot);
   }
-
   function clearSessionSnapshot() {
     LS.set(K.session, null);
   }
-
   function restoreSession() {
     const snap = LS.get(K.session, null);
     if (!snap || !snap.questionIds || !snap.questionIds.length) return false;
@@ -220,7 +216,6 @@
       .filter(Boolean);
 
     if (list.length !== snap.questionIds.length) {
-      // 题库变了，放弃恢复
       clearSessionSnapshot();
       return false;
     }
@@ -241,7 +236,6 @@
     };
     return true;
   }
-
   function getSavedSessionSummary() {
     const snap = LS.get(K.session, null);
     if (!snap || !snap.questionIds || !snap.questionIds.length) return null;
@@ -271,6 +265,7 @@
     const saved = getSavedSessionSummary();
 
     topbarEl.innerHTML =
+      '<button class="tb-back" data-act="portal">‹ 主页</button>' +
       '<div class="tb-title">📚 智能刷题</div>' +
       '<button class="tb-icon-btn" data-act="theme">' +
       (getTheme() === "dark" ? "☀️" : "🌙") +
@@ -357,7 +352,7 @@
       '<div class="foot">' +
       '<button class="btn ghost small" data-act="reset-stats">清空统计数据</button>' +
       "</div>" +
-      '<p class="tip">数据仅保存在本机浏览器 · 电脑端可用 A/B/C/D 选择、← → 翻页、S 收藏、M 打开答题卡</p>';
+      '<p class="tip">数据仅保存在本机浏览器 · 电脑端 A/B/C/D 选择、← → 翻页、S 收藏、M 答题卡</p>';
 
     window.scrollTo(0, 0);
   }
@@ -438,14 +433,12 @@
   function renderQuestion() {
     if (!session) return;
 
-    // 保存模块进度
     if (session.mode === "module" && session.module) {
       const progress = LS.get(K.progress, {});
       progress[session.module] = session.index;
       LS.set(K.progress, progress);
     }
 
-    // 保存会话快照，支持刷新恢复
     saveSessionSnapshot();
 
     const q = currentQuestion();
@@ -696,7 +689,6 @@
 
     overlay.classList.add("show");
 
-    // 滚到当前题附近
     setTimeout(function () {
       const curCell = overlay.querySelector(".ac-cell.current");
       if (curCell) curCell.scrollIntoView({ block: "center" });
@@ -976,6 +968,9 @@
     } else if (act === "home") {
       if (el.dataset.clear === "1") clearSessionSnapshot();
       renderHome();
+    } else if (act === "portal") {
+      // 同目录的门户页 index.html
+      window.location.href = "index.html";
     } else if (act === "restart") {
       const m = session.mode;
       const mod = session.module;
@@ -1015,7 +1010,6 @@
      十四、键盘快捷键（电脑端）
      ============================================================ */
   document.addEventListener("keydown", function (e) {
-    // 输入框里不触发快捷键
     const tag = e.target && e.target.tagName;
     if (tag === "INPUT" || tag === "TEXTAREA") {
       if (e.target.id === "ac-jump-input" && e.key === "Enter") {
@@ -1025,13 +1019,11 @@
       return;
     }
 
-    // ESC 关闭答题卡
     if (e.key === "Escape") {
       closeAnswerCard();
       return;
     }
 
-    // 答题卡打开时，屏蔽其他快捷键（除 ESC）
     const overlay = document.getElementById("ac-overlay");
     if (overlay && overlay.classList.contains("show")) return;
 
@@ -1041,7 +1033,6 @@
 
     const key = e.key.toUpperCase();
 
-    // A/B/C/D... 选择选项
     const letterIndex = LETTERS.indexOf(key);
     if (letterIndex >= 0 && letterIndex < q.options.length) {
       e.preventDefault();
@@ -1049,7 +1040,6 @@
       return;
     }
 
-    // Enter：提交 / 下一题
     if (e.key === "Enter") {
       e.preventDefault();
       if (session.reviewMode) {
@@ -1066,7 +1056,6 @@
       return;
     }
 
-    // ← → 翻页
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       handlePrev();
@@ -1078,14 +1067,11 @@
       return;
     }
 
-    // S 收藏
     if (key === "S") {
       e.preventDefault();
       handleFav();
       return;
     }
-
-    // M 打开答题卡
     if (key === "M") {
       e.preventDefault();
       openAnswerCard();
@@ -1111,7 +1097,17 @@
       '<p style="text-align:center;color:var(--sub);padding:40px 0;">题库为空，请在 data 文件夹添加题库文件。</p>';
   } else {
     const mode = getUrlParam("mode");
-    if (mode === "wrong" || mode === "fav" || mode === "exam") {
+    const moduleName = getUrlParam("module");
+
+    if (moduleName) {
+      const modules = getModules();
+      if (modules.indexOf(moduleName) >= 0) {
+        startPractice("module", moduleName);
+      } else {
+        alert("找不到模块：" + moduleName);
+        renderHome();
+      }
+    } else if (mode === "wrong" || mode === "fav" || mode === "exam") {
       startPractice(mode);
     } else {
       renderHome();
