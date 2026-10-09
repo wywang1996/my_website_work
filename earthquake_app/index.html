@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>地震实时监测 · 3D 地球</title>
+
+    <!-- ✅ 新增：favicon + PWA -->
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌍</text></svg>"
+    />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#0a1020" />
+
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <div id="globe"></div>
+    <svg id="leader-lines"></svg>
+    <div id="zone-overlay"></div>
+
+    <div id="hud-top" class="panel">
+      <div class="hud-title">
+        <span class="live-dot"></span>全球地震实时监测
+      </div>
+      <div class="hud-row"><span>近 30 天</span><b id="stat-count">—</b></div>
+      <div class="hud-row"><span>最大震级</span><b id="stat-max">—</b></div>
+      <div class="hud-row recent">
+        <span>🔥 近 7 天</span><b id="stat-week">—</b>
+      </div>
+      <div class="hud-row zone-row">
+        <span>⚠️ 预警区域</span><b id="stat-zones">—</b>
+      </div>
+      <div class="hud-row"><span>数据源</span><b id="stat-source">—</b></div>
+      <div class="hud-row"><span>更新于</span><b id="stat-time">—</b></div>
+    </div>
+
+    <div id="search-box">
+      <input
+        id="search-input"
+        type="text"
+        placeholder="🔍 搜索区域（如 Japan、加州）"
+        autocomplete="off"
+      />
+    </div>
+
+    <div id="legend" class="panel">
+      <div class="legend-title">震级图例</div>
+      <div class="legend-item">
+        <i class="legend-dot" style="background: #22c55e; color: #22c55e"></i>M
+        3.0 – 3.9
+      </div>
+      <div class="legend-item">
+        <i class="legend-dot" style="background: #eab308; color: #eab308"></i>M
+        4.0 – 4.9
+      </div>
+      <div class="legend-item">
+        <i class="legend-dot" style="background: #f97316; color: #f97316"></i>M
+        5.0 – 5.9
+      </div>
+      <div class="legend-item">
+        <i class="legend-dot" style="background: #ef4444; color: #ef4444"></i>M
+        6.0 – 6.9
+      </div>
+      <div class="legend-item">
+        <i class="legend-dot" style="background: #a855f7; color: #a855f7"></i>M
+        7.0+
+      </div>
+      <div class="legend-sub">
+        <b>近 7 天</b>：亮色圆盘 + 脉冲<br />
+        <b>预警区域</b>：大圆 + 引线 + 标签
+      </div>
+    </div>
+
+    <div id="actions">
+      <button id="btn-zones" class="act-btn active">⚠️ 预警区域</button>
+      <button id="btn-mode" class="act-btn">🔥 热力模式</button>
+      <button id="btn-week" class="act-btn">📅 只看 7 天</button>
+      <button id="btn-rotate" class="act-btn active">⟳ 自动旋转</button>
+      <button id="btn-reset" class="act-btn">⌖ 重置视角</button>
+      <button id="btn-notify" class="act-btn">🔔 开启通知</button>
+    </div>
+
+    <div id="zones-panel" class="panel show">
+      <div class="zones-header" id="zones-header">
+        <span class="zones-title">⚠️ 活跃预警区域</span>
+        <span class="zones-header-right">
+          <span class="zones-count" id="zones-count">0</span>
+          <span class="zones-toggle">
+            <svg
+              width="10"
+              height="6"
+              viewBox="0 0 10 6"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M1 1L5 5L9 1" />
+            </svg>
+          </span>
+        </span>
+      </div>
+      <div class="zones-list" id="zones-list">
+        <div class="zones-empty">正在分析地震数据…</div>
+      </div>
+    </div>
+
+    <div id="timeline" class="panel">
+      <button id="tl-play" class="tl-btn" title="回放">▶</button>
+      <input
+        id="tl-slider"
+        type="range"
+        min="0"
+        max="1000"
+        value="1000"
+        step="1"
+      />
+      <span id="tl-time">—</span>
+    </div>
+
+    <div id="status">正在获取地震数据…</div>
+    <div id="detail" class="panel"></div>
+
+    <div id="boot">
+      <div class="boot-inner">
+        <div class="boot-ring"></div>
+        LOADING EARTH
+        <div id="boot-error">
+          ⚠️ 3D 资源加载失败，请检查网络或尝试使用 Chrome 浏览器
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/globe.gl"></script>
+    <script type="module" src="js/main.js"></script>
+
+    <!-- ✅ 新增：Service Worker 注册（离线缓存） -->
+    <script>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker.register("sw.js").then(
+            (reg) => console.log("[SW] 注册成功:", reg.scope),
+            (err) => console.warn("[SW] 注册失败:", err),
+          );
+        });
+      }
+    </script>
+  </body>
+</html>

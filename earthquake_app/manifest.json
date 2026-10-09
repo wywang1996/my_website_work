@@ -1,0 +1,20 @@
+{
+  "name": "地震实时监测 · 3D 地球",
+  "short_name": "地震监测",
+  "description": "全球近 30 天 M3.0+ 地震实时监测，含活跃预警区域识别",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#000308",
+  "theme_color": "#0a1020",
+  "lang": "zh-CN",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%8D%3C/text%3E%3C/svg%3E",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
