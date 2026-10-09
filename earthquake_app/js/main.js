@@ -57,6 +57,7 @@ const state = {
   zonesCollapsed: false,
   allPoints: [],
   allZones: [],
+  lastPreprocessed: null,
   timeline: {
     start: Date.now() - CFG.daysBack * 86400000,
     end: Date.now(),
@@ -107,6 +108,8 @@ const zonesPanel = initZonesPanel({
   onToggleCollapse: () => {
     state.zonesCollapsed = !state.zonesCollapsed;
     zonesPanel.render(state.allZones, state.zonesCollapsed);
+    // 折叠/展开后重新定位（高度变化）
+    requestAnimationFrame(repositionZonesPanel);
   },
 });
 
@@ -139,7 +142,6 @@ initNotify();
 const settingsPanel = initSettings({
   getAllPoints: () => state.allPoints,
   onSettingsChange: (s) => {
-    // 设置变化时同步声音按钮文案
     const btn = document.getElementById("btn-notify");
     if (
       btn &&
@@ -151,6 +153,47 @@ const settingsPanel = initSettings({
     }
   },
 });
+
+/* ============================================================
+ *  右上按钮 / 面板 自适应定位
+ *  - 预警面板始终贴着右上按钮下方
+ *  - 搜索框始终贴着左上 HUD 下方
+ * ============================================================ */
+function repositionZonesPanel() {
+  const actions = document.getElementById("actions");
+  const panel = document.getElementById("zones-panel");
+  if (!actions || !panel) return;
+
+  const rect = actions.getBoundingClientRect();
+  const top = Math.round(rect.bottom + 12);
+  panel.style.top = top + "px";
+
+  const viewportH = window.innerHeight;
+  const maxH = Math.max(120, viewportH - top - 90); // 留出底部时间轴 + 状态条空间
+  panel.style.maxHeight = Math.min(420, maxH) + "px";
+}
+
+function repositionSearchBox() {
+  const hud = document.getElementById("hud-top");
+  const box = document.getElementById("search-box");
+  if (!hud || !box) return;
+  const rect = hud.getBoundingClientRect();
+  box.style.top = Math.round(rect.bottom + 12) + "px";
+}
+
+// 初次定位
+requestAnimationFrame(() => {
+  repositionSearchBox();
+  repositionZonesPanel();
+});
+
+// 窗口缩放 / 屏幕旋转时重新定位
+const handleResize = debounce(() => {
+  repositionSearchBox();
+  repositionZonesPanel();
+}, 150);
+window.addEventListener("resize", handleResize);
+window.addEventListener("orientationchange", handleResize);
 
 /* ============================================================
  *  地球点击
@@ -244,7 +287,7 @@ function applyMode() {
   // 通知
   checkAlerts(zones);
 
-  // 趋势（每周对比）
+  // 趋势
   const trend = computeTrend(state.allPoints, 7);
   const trendText = formatTrend(trend);
 
@@ -260,6 +303,9 @@ function applyMode() {
       trendText,
     });
   }
+
+  // 面板显示/隐藏后重新定位
+  requestAnimationFrame(repositionZonesPanel);
 }
 
 /* ============================================================
@@ -303,7 +349,6 @@ async function loadEarthquakes(isFirst) {
     saveCache(points);
     timeline.show();
 
-    // 刷新设置面板中的订阅命中数
     settingsPanel.refresh();
 
     if (pre.points.length === 0) {
@@ -442,6 +487,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "c" || e.key === "C") {
     state.zonesCollapsed = !state.zonesCollapsed;
     zonesPanel.render(state.allZones, state.zonesCollapsed);
+    requestAnimationFrame(repositionZonesPanel);
   }
   if (e.key === "/") {
     e.preventDefault();
