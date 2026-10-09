@@ -1,6 +1,9 @@
 /**
  * 浏览器通知 + 声音提醒
  * 当预警区域等级升到「高危」且分数显著上升时触发一次
+ *
+ * 注意：浏览器要求音频必须在「用户交互之后」才能播放。
+ * 因此这里加了 audioUnlocked 标记，只有用户首次点击/按键后才启用声音。
  */
 
 import { showStatus, hideStatus } from "./hud.js";
@@ -12,9 +15,29 @@ const state = {
   soundEnabled: true,
   lastTopScore: 0,
   lastAlertKey: "",
+  audioUnlocked: false, // 用户是否已交互过
 };
 
 let audioCtx = null;
+
+/* ============================================================
+ *  音频解锁：用户第一次点击/按键时创建 AudioContext
+ * ============================================================ */
+function unlockAudio() {
+  if (state.audioUnlocked) return;
+  try {
+    audioCtx =
+      audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    state.audioUnlocked = true;
+  } catch (e) {
+    /* 静默失败 */
+  }
+}
+
+["pointerdown", "keydown", "touchstart"].forEach((evt) => {
+  document.addEventListener(evt, unlockAudio, { once: true, passive: true });
+});
 
 /* ============================================================
  *  初始化按钮
@@ -22,6 +45,9 @@ let audioCtx = null;
 export function initNotify() {
   const btn = document.getElementById("btn-notify");
   if (!btn) return;
+
+  // 点击按钮本身就是一次交互，顺便解锁音频
+  btn.addEventListener("pointerdown", unlockAudio);
 
   btn.addEventListener("click", async () => {
     if (!("Notification" in window)) {
@@ -59,9 +85,11 @@ export function initNotify() {
  * ============================================================ */
 function playAlertSound() {
   if (!state.soundEnabled) return;
+  // 用户还没交互 → 静默跳过，避免浏览器报错
+  if (!state.audioUnlocked) return;
+
   try {
-    audioCtx =
-      audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (!audioCtx) return;
     if (audioCtx.state === "suspended") audioCtx.resume();
 
     const t = audioCtx.currentTime;
