@@ -536,84 +536,141 @@ body {
 }
 
 /* ============================================================
- *  时间轴
+ *  时间轴（紧凑胶囊 + 半透明 + 进度渐变）
  * ============================================================ */
 #timeline {
   position: absolute;
-  bottom: 50px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
-  padding: 10px 16px;
+  padding: 8px 14px 8px 8px;
   display: flex;
   align-items: center;
   gap: 12px;
-  width: min(560px, calc(100vw - 40px));
-  opacity: 0;
+  width: min(440px, calc(100vw - 32px));
+  border-radius: 26px;
+  opacity: 0.55;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition:
+    opacity 0.25s ease,
+    box-shadow 0.25s ease;
 }
 #timeline.show {
-  opacity: 1;
+  opacity: 0.85;
   pointer-events: auto;
 }
+#timeline:hover,
+#timeline:focus-within {
+  opacity: 1;
+  box-shadow:
+    0 12px 48px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
 .tl-btn {
   appearance: none;
   border: none;
-  background: rgba(110, 165, 255, 0.12);
-  color: #a9c1e0;
+  background: rgba(74, 144, 217, 0.22);
+  color: #cfe0ff;
   font-size: 13px;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   cursor: pointer;
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  transition: all 0.15s;
+  transition: all 0.15s ease;
+  padding-left: 2px;
   font-family: inherit;
 }
 .tl-btn:hover {
-  background: rgba(110, 165, 255, 0.25);
-  color: #e6f0ff;
+  background: rgba(74, 144, 217, 0.5);
+  color: #ffffff;
+  transform: scale(1.06);
 }
 .tl-btn.active {
-  background: rgba(74, 222, 128, 0.2);
+  background: rgba(74, 222, 128, 0.28);
   color: #4ade80;
+  padding-left: 0;
+  box-shadow: 0 0 14px rgba(74, 222, 128, 0.5);
 }
+
 #tl-slider {
   flex: 1;
   appearance: none;
-  height: 4px;
-  background: rgba(110, 165, 255, 0.18);
-  border-radius: 2px;
+  -webkit-appearance: none;
+  height: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(74, 144, 217, 0.5) 0%,
+    rgba(74, 144, 217, 0.15) var(--progress, 100%),
+    rgba(74, 144, 217, 0.15) 100%
+  );
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
+  transition: height 0.15s ease;
 }
+#tl-slider:hover {
+  height: 7px;
+}
+
 #tl-slider::-webkit-slider-thumb {
   appearance: none;
-  width: 14px;
-  height: 14px;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #4a90d9;
   cursor: grab;
-  box-shadow: 0 0 8px rgba(74, 144, 217, 0.6);
+  box-shadow:
+    0 0 10px rgba(74, 144, 217, 0.75),
+    0 0 0 3px rgba(74, 144, 217, 0.18);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease;
+  margin-top: -1px;
 }
+#tl-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+#tl-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  box-shadow:
+    0 0 16px rgba(74, 144, 217, 0.95),
+    0 0 0 5px rgba(74, 144, 217, 0.28);
+}
+
 #tl-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   border: none;
   background: #4a90d9;
   cursor: grab;
+  box-shadow:
+    0 0 10px rgba(74, 144, 217, 0.75),
+    0 0 0 3px rgba(74, 144, 217, 0.18);
 }
+
+#tl-slider::-moz-range-track {
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(110, 165, 255, 0.18);
+  border: none;
+}
+
 #tl-time {
-  font-size: 11px;
-  color: #8fa8cc;
+  font-size: 11.5px;
+  color: #cfe0ff;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  min-width: 110px;
+  min-width: 88px;
   text-align: right;
+  font-weight: 500;
+  letter-spacing: 0.2px;
 }
 
 /* ============================================================
@@ -621,7 +678,7 @@ body {
  * ============================================================ */
 #status {
   position: absolute;
-  bottom: 18px;
+  bottom: 58px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 20;
@@ -1326,7 +1383,6 @@ body {
     display: none;
   }
 
-  /* 搜索框：宽度撑满，top 由 JS 控制 */
   #search-box {
     left: 16px;
     right: 16px;
@@ -1349,7 +1405,6 @@ body {
     padding: 7px 11px;
   }
 
-  /* 预警面板：top / max-height 由 JS 控制 */
   #zones-panel {
     right: 12px;
     left: 12px;
@@ -1360,16 +1415,28 @@ body {
   }
 
   #status {
-    bottom: 74px;
+    bottom: 62px;
     font-size: 11px;
   }
+
+  /* 时间轴移动端 */
   #timeline {
-    bottom: 20px;
-    padding: 8px 12px;
+    bottom: 12px;
+    padding: 6px 10px 6px 6px;
     gap: 8px;
+    width: calc(100vw - 24px);
+    border-radius: 22px;
+  }
+  #timeline.show {
+    opacity: 0.9;
+  }
+  .tl-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 11px;
   }
   #tl-time {
-    min-width: 82px;
+    min-width: 68px;
     font-size: 10px;
   }
 

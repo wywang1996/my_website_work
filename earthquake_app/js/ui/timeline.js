@@ -32,6 +32,9 @@ export function initTimeline({ getState, onUpdate, onAutoRotateOff }) {
     const ratio = (tl.current - tl.start) / span;
     slider.value = Math.round(ratio * 1000);
 
+    // 更新滑块左侧的进度渐变
+    slider.style.setProperty("--progress", (ratio * 100).toFixed(1) + "%");
+
     timeEl.textContent = tl.playing
       ? `▶ ${fmtShort(tl.current)}`
       : tl.enabled
@@ -45,7 +48,6 @@ export function initTimeline({ getState, onUpdate, onAutoRotateOff }) {
     const span = tl.end - tl.start;
 
     tl.current = tl.start + (parseInt(slider.value, 10) / 1000) * span;
-    // 距离终点 1 秒内视为“实时”
     tl.enabled = tl.current < tl.end - 1000;
     if (!tl.enabled) tl.current = tl.end;
 
@@ -64,7 +66,7 @@ export function initTimeline({ getState, onUpdate, onAutoRotateOff }) {
 
     if (lastT) {
       const dt = ts - lastT;
-      tl.current += (dt * CFG.replaySpeedMs) / 1000; // 每秒推进 replaySpeedMs
+      tl.current += (dt * CFG.replaySpeedMs) / 1000;
 
       if (tl.current >= tl.end) {
         tl.current = tl.end;

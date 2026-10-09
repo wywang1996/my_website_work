@@ -6,7 +6,6 @@ import { CFG, HOME_VIEW } from "./config.js";
 import { fetchAllSources } from "./data/fetcher.js";
 import { saveCache, loadCache } from "./data/cache.js";
 import { preprocess } from "./data/preprocess.js";
-import { computeActiveZones } from "./algo/zones.js";
 import { computeTrend, formatTrend } from "./algo/trend.js";
 import { initGlobe, resizeGlobe, resetView } from "./globe/init.js";
 import {
@@ -28,6 +27,8 @@ import { initTimeline } from "./ui/timeline.js";
 import { initSearch } from "./ui/search.js";
 import { initNotify, checkAlerts } from "./ui/notify.js";
 import { initSettings } from "./ui/settings.js";
+import { initExport } from "./ui/export.js";
+import { computeZonesAsync } from "./workers/clusterClient.js";
 import { debounce } from "./utils/format.js";
 
 /* ============================================================
@@ -46,6 +47,11 @@ if (typeof Globe === "undefined") {
   document.getElementById("status").textContent = "3D 引擎加载失败";
   throw new Error("globe.gl not loaded");
 }
+
+/* ============================================================
+ *  暴露给 export.js 的状态提示 API
+ * ============================================================ */
+window.__hudApi = { showStatus, hideStatus };
 
 /* ============================================================
  *  应用状态
@@ -67,7 +73,12 @@ const state = {
   },
   searchTerm: "",
   zoomLevel: "near",
-  sources: { usgs: { count: 0, ok: false }, emsc: { count: 0, ok: false } },
+  sources: {
+    usgs: { count: 0, ok: false },
+    emsc: { count: 0, ok: false },
+    cenc: { count: 0, ok: false },
+    jma: { count: 0, ok: false },
+  },
   lastFetch: 0,
 };
 
@@ -108,7 +119,6 @@ const zonesPanel = initZonesPanel({
   onToggleCollapse: () => {
     state.zonesCollapsed = !state.zonesCollapsed;
     zonesPanel.render(state.allZones, state.zonesCollapsed);
-    // 折叠/展开后重新定位（高度变化）
     requestAnimationFrame(repositionZonesPanel);
   },
 });
@@ -135,7 +145,7 @@ const search = initSearch({
 });
 
 /* ============================================================
- *  通知 + 设置
+ *  通知 + 设置 + 导出
  * ============================================================ */
 initNotify();
 
@@ -154,10 +164,13 @@ const settingsPanel = initSettings({
   },
 });
 
+initExport({
+  getAllPoints: () => state.allPoints,
+  getAllZones: () => state.allZones,
+});
+
 /* ============================================================
- *  右上按钮 / 面板 自适应定位
- *  - 预警面板始终贴着右上按钮下方
- *  - 搜索框始终贴着左上 HUD 下方
+ *  自适应定位
  * ============================================================ */
 function repositionZonesPanel() {
   const actions = document.getElementById("actions");
@@ -169,7 +182,7 @@ function repositionZonesPanel() {
   panel.style.top = top + "px";
 
   const viewportH = window.innerHeight;
-  const maxH = Math.max(120, viewportH - top - 90); // 留出底部时间轴 + 状态条空间
+  const maxH = Math.max(120, viewportH - top - 90);
   panel.style.maxHeight = Math.min(420, maxH) + "px";
 }
 
@@ -181,13 +194,11 @@ function repositionSearchBox() {
   box.style.top = Math.round(rect.bottom + 12) + "px";
 }
 
-// 初次定位
 requestAnimationFrame(() => {
   repositionSearchBox();
   repositionZonesPanel();
 });
 
-// 窗口缩放 / 屏幕旋转时重新定位
 const handleResize = debounce(() => {
   repositionSearchBox();
   repositionZonesPanel();
@@ -249,9 +260,13 @@ function getVisiblePoints() {
 }
 
 /* ============================================================
- *  应用模式
+ *  应用模式（异步：聚类在 Worker 线程）
  * ============================================================ */
-function applyMode() {
+let applySeq = 0;
+
+async function applyMode() {
+  const mySeq = ++applySeq;
+
   const isHeat = state.mode === "heat";
   const isWeekOnly = state.filter === "week";
   const showZones = state.showZones && !isHeat;
@@ -259,7 +274,19 @@ function applyMode() {
   let points = getVisiblePoints();
   if (isWeekOnly) points = points.filter((p) => p.isRecent);
 
-  const zones = computeActiveZones(points);
+  // ---- 异步聚类（Worker） ----
+  let zones = [];
+  try {
+    zones = await computeZonesAsync(points);
+  } catch (err) {
+    console.warn("聚类 Worker 失败，回退主线程:", err);
+    const m = await import("./algo/zones.js");
+    zones = m.computeActiveZones(points);
+  }
+
+  // 竞态保护
+  if (mySeq !== applySeq) return;
+
   state.allZones = zones;
 
   if (isHeat) {
@@ -291,7 +318,7 @@ function applyMode() {
   const trend = computeTrend(state.allPoints, 7);
   const trendText = formatTrend(trend);
 
-  // 更新 HUD
+  // HUD
   const pre = state.lastPreprocessed;
   if (pre) {
     updateHUD({
@@ -304,7 +331,6 @@ function applyMode() {
     });
   }
 
-  // 面板显示/隐藏后重新定位
   requestAnimationFrame(repositionZonesPanel);
 }
 
@@ -315,7 +341,6 @@ function applyPreprocessed(pre, sources) {
   state.allPoints = pre.points;
   state.lastPreprocessed = pre;
   if (sources) state.sources = sources;
-
   applyMode();
 }
 
@@ -348,7 +373,6 @@ async function loadEarthquakes(isFirst) {
     applyPreprocessed(pre, sources);
     saveCache(points);
     timeline.show();
-
     settingsPanel.refresh();
 
     if (pre.points.length === 0) {
@@ -364,7 +388,11 @@ async function loadEarthquakes(isFirst) {
     } else {
       const u = sources.usgs.count,
         e = sources.emsc.count;
-      showStatus(`已加载 ${pre.points.length} 条 · USGS ${u} + EMSC ${e}`);
+      const c = sources.cenc.count,
+        j = sources.jma.count;
+      showStatus(
+        `已加载 ${pre.points.length} 条 · USGS ${u} EMSC ${e} CENC ${c} JMA ${j}`,
+      );
       hideStatus(3400);
     }
   } catch (err) {

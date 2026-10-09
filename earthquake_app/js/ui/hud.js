@@ -10,8 +10,8 @@ const $ = (id) => document.getElementById(id);
  * @param {number} opt.maxMag
  * @param {number} opt.recentCount
  * @param {number} opt.zoneCount
- * @param {object} opt.sources  {usgs: {count, ok}, emsc: {count, ok}}
- * @param {string} [opt.trendText]  例如 "比上 7 天 ↑ 42%"
+ * @param {object} opt.sources  {usgs:{count,ok}, emsc:{...}, cenc:{...}, jma:{...}}
+ * @param {string} [opt.trendText]
  */
 export function updateHUD({
   total,
@@ -30,15 +30,14 @@ export function updateHUD({
   });
 
   if (sources) {
-    const u = sources.usgs || {};
-    const e = sources.emsc || {};
-    const uOk = u.ok ? "✓" : "✗";
-    const eOk = e.ok ? "✓" : "✗";
-    $("stat-source").textContent =
-      `USGS ${u.count || 0} ${uOk} · EMSC ${e.count || 0} ${eOk}`;
+    const parts = [];
+    for (const [key, val] of Object.entries(sources)) {
+      const ok = val.ok ? "" : " ✗";
+      parts.push(`${key.toUpperCase()} ${val.count}${ok}`);
+    }
+    $("stat-source").textContent = parts.join(" · ");
   }
 
-  // 趋势文案（可选）
   const trendRow = $("stat-trend");
   if (trendRow && trendText) {
     trendRow.textContent = trendText;
