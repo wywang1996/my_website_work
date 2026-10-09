@@ -4,18 +4,23 @@
 
 const $ = (id) => document.getElementById(id);
 
-/* ============================================================
- *  HUD 数据更新
- * ============================================================ */
 /**
  * @param {object} opt
- * @param {number} opt.total      近 30 天总条数
- * @param {number} opt.maxMag     最大震级
- * @param {number} opt.recentCount 近 7 天条数
- * @param {number} opt.zoneCount   预警区域数
- * @param {object} opt.sources    {usgs, emsc}
+ * @param {number} opt.total
+ * @param {number} opt.maxMag
+ * @param {number} opt.recentCount
+ * @param {number} opt.zoneCount
+ * @param {object} opt.sources  {usgs: {count, ok}, emsc: {count, ok}}
+ * @param {string} [opt.trendText]  例如 "比上 7 天 ↑ 42%"
  */
-export function updateHUD({ total, maxMag, recentCount, zoneCount, sources }) {
+export function updateHUD({
+  total,
+  maxMag,
+  recentCount,
+  zoneCount,
+  sources,
+  trendText,
+}) {
   $("stat-count").textContent = total.toLocaleString("en-US");
   $("stat-max").textContent = total ? "M " + maxMag.toFixed(1) : "—";
   $("stat-week").textContent = recentCount.toLocaleString("en-US");
@@ -25,14 +30,21 @@ export function updateHUD({ total, maxMag, recentCount, zoneCount, sources }) {
   });
 
   if (sources) {
+    const u = sources.usgs || {};
+    const e = sources.emsc || {};
+    const uOk = u.ok ? "✓" : "✗";
+    const eOk = e.ok ? "✓" : "✗";
     $("stat-source").textContent =
-      `USGS ${sources.usgs} · EMSC ${sources.emsc}`;
+      `USGS ${u.count || 0} ${uOk} · EMSC ${e.count || 0} ${eOk}`;
+  }
+
+  // 趋势文案（可选）
+  const trendRow = $("stat-trend");
+  if (trendRow && trendText) {
+    trendRow.textContent = trendText;
   }
 }
 
-/* ============================================================
- *  底部状态条
- * ============================================================ */
 export function showStatus(text, isError, isAlert) {
   const el = $("status");
   el.textContent = text;
@@ -45,9 +57,6 @@ export function hideStatus(delay) {
   setTimeout(() => $("status").classList.add("hidden"), delay || 0);
 }
 
-/* ============================================================
- *  启动遮罩
- * ============================================================ */
 export function markBootDone() {
   const boot = $("boot");
   if (boot) boot.classList.add("done");

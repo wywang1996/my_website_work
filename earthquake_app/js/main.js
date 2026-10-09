@@ -7,6 +7,7 @@ import { fetchAllSources } from "./data/fetcher.js";
 import { saveCache, loadCache } from "./data/cache.js";
 import { preprocess } from "./data/preprocess.js";
 import { computeActiveZones } from "./algo/zones.js";
+import { computeTrend, formatTrend } from "./algo/trend.js";
 import { initGlobe, resizeGlobe, resetView } from "./globe/init.js";
 import {
   renderPointsMode,
@@ -26,6 +27,7 @@ import { initDetail, hide as hideDetail } from "./ui/detail.js";
 import { initTimeline } from "./ui/timeline.js";
 import { initSearch } from "./ui/search.js";
 import { initNotify, checkAlerts } from "./ui/notify.js";
+import { initSettings } from "./ui/settings.js";
 import { debounce } from "./utils/format.js";
 
 /* ============================================================
@@ -49,8 +51,8 @@ if (typeof Globe === "undefined") {
  *  应用状态
  * ============================================================ */
 const state = {
-  mode: "points", // 'points' | 'heat'
-  filter: "all", // 'all' | 'week'
+  mode: "points",
+  filter: "all",
   showZones: true,
   zonesCollapsed: false,
   allPoints: [],
@@ -63,8 +65,8 @@ const state = {
     enabled: false,
   },
   searchTerm: "",
-  zoomLevel: "near", // 'near' | 'mid' | 'far'
-  sources: { usgs: 0, emsc: 0 },
+  zoomLevel: "near",
+  sources: { usgs: { count: 0, ok: false }, emsc: { count: 0, ok: false } },
   lastFetch: 0,
 };
 
@@ -86,7 +88,9 @@ const labels = createLabelsUpdater(globe, () => state);
 /* ============================================================
  *  详情卡片
  * ============================================================ */
-const detail = initDetail(globe);
+const detail = initDetail(globe, {
+  getAllPoints: () => state.allPoints,
+});
 
 /* ============================================================
  *  预警面板
@@ -128,12 +132,28 @@ const search = initSearch({
 });
 
 /* ============================================================
- *  通知
+ *  通知 + 设置
  * ============================================================ */
 initNotify();
 
+const settingsPanel = initSettings({
+  getAllPoints: () => state.allPoints,
+  onSettingsChange: (s) => {
+    // 设置变化时同步声音按钮文案
+    const btn = document.getElementById("btn-notify");
+    if (
+      btn &&
+      "Notification" in window &&
+      Notification.permission === "granted"
+    ) {
+      btn.textContent = s.soundEnabled ? "🔔 声音 开" : "🔕 声音 关";
+      btn.classList.toggle("active", s.soundEnabled);
+    }
+  },
+});
+
 /* ============================================================
- *  地球点击事件
+ *  地球点击
  * ============================================================ */
 globe.onPointClick((d) => {
   if (d.isZone) {
@@ -149,13 +169,11 @@ globe.onPointClick((d) => {
 
 globe.onHexClick((d) => {
   if (!d || !Array.isArray(d.points) || d.points.length === 0) return;
-
   let strongest = d.points[0];
   for (const p of d.points) {
     if (p && typeof p.mag === "number" && p.mag > strongest.mag) strongest = p;
   }
   detail.show(strongest);
-
   const recentN = d.points.filter((p) => p.isRecent).length;
   if (d.points.length > 1) {
     const extra = recentN > 0 ? ` · 近7天 ${recentN} 次` : "";
@@ -171,30 +189,24 @@ globe.onHexClick((d) => {
 function getVisiblePoints() {
   let arr = state.allPoints;
 
-  // 时间轴
   if (state.timeline.enabled) {
     const cutoff = state.timeline.current;
     arr = arr.filter((p) => p.time <= cutoff);
   }
-
-  // 搜索
   if (state.searchTerm) {
     const q = state.searchTerm.toLowerCase();
     arr = arr.filter((p) => p.place && p.place.toLowerCase().includes(q));
   }
-
-  // 缩放剔除
   if (state.zoomLevel === "far") {
     arr = arr.filter((p) => p.mag >= 4.5 || p.isRecent);
   } else if (state.zoomLevel === "mid") {
     arr = arr.filter((p) => p.mag >= 3.8 || p.isRecent);
   }
-
   return arr;
 }
 
 /* ============================================================
- *  应用模式：渲染 + UI 同步
+ *  应用模式
  * ============================================================ */
 function applyMode() {
   const isHeat = state.mode === "heat";
@@ -229,8 +241,25 @@ function applyMode() {
   zonesPanel.setVisible(showZones);
   labels.update(zones);
 
-  // 预警通知
+  // 通知
   checkAlerts(zones);
+
+  // 趋势（每周对比）
+  const trend = computeTrend(state.allPoints, 7);
+  const trendText = formatTrend(trend);
+
+  // 更新 HUD
+  const pre = state.lastPreprocessed;
+  if (pre) {
+    updateHUD({
+      total: pre.points.length,
+      maxMag: pre.maxMag,
+      recentCount: pre.recentCount,
+      zoneCount: zones.length,
+      sources: state.sources,
+      trendText,
+    });
+  }
 }
 
 /* ============================================================
@@ -238,17 +267,10 @@ function applyMode() {
  * ============================================================ */
 function applyPreprocessed(pre, sources) {
   state.allPoints = pre.points;
+  state.lastPreprocessed = pre;
   if (sources) state.sources = sources;
 
   applyMode();
-
-  updateHUD({
-    total: pre.points.length,
-    maxMag: pre.maxMag,
-    recentCount: pre.recentCount,
-    zoneCount: state.allZones.length,
-    sources: state.sources,
-  });
 }
 
 /* ============================================================
@@ -260,12 +282,11 @@ async function loadEarthquakes(isFirst) {
   if (loading) return;
   loading = true;
 
-  // 首次先渲染缓存
   if (isFirst) {
     showStatus("正在获取地震数据…");
     const cached = loadCache();
     if (cached && cached.length) {
-      applyPreprocessed(preprocess(cached));
+      applyPreprocessed(preprocess(cached), state.sources);
       showStatus(`已从缓存加载 ${cached.length} 条，正在刷新…`);
     }
   }
@@ -282,6 +303,9 @@ async function loadEarthquakes(isFirst) {
     saveCache(points);
     timeline.show();
 
+    // 刷新设置面板中的订阅命中数
+    settingsPanel.refresh();
+
     if (pre.points.length === 0) {
       showStatus("近 30 天内暂无 M3.0+ 地震记录");
     } else if (state.allZones.length > 0) {
@@ -293,9 +317,9 @@ async function loadEarthquakes(isFirst) {
       );
       hideStatus(5200);
     } else {
-      showStatus(
-        `已加载 ${pre.points.length} 条 · USGS ${sources.usgs} + EMSC ${sources.emsc}`,
-      );
+      const u = sources.usgs.count,
+        e = sources.emsc.count;
+      showStatus(`已加载 ${pre.points.length} 条 · USGS ${u} + EMSC ${e}`);
       hideStatus(3400);
     }
   } catch (err) {
@@ -366,14 +390,13 @@ const checkZoomLevel = debounce(() => {
 
 controls.addEventListener("change", checkZoomLevel);
 
-/* 双击回到全球视角 */
 globeEl.addEventListener("dblclick", () => {
   resetView(globe, controls);
   btnRotate.classList.add("active");
 });
 
 /* ============================================================
- *  启动 + 定时刷新
+ *  启动 + 刷新
  * ============================================================ */
 loadEarthquakes(true);
 
@@ -398,6 +421,7 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     hideDetail();
     search.blur();
+    settingsPanel.close();
   }
   if (e.key === "r" || e.key === "R") {
     controls.autoRotate = !controls.autoRotate;
@@ -426,5 +450,8 @@ window.addEventListener("keydown", (e) => {
   if (e.key === " ") {
     e.preventDefault();
     timeline.toggle();
+  }
+  if (e.key === "s" || e.key === "S") {
+    settingsPanel.open();
   }
 });
